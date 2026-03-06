@@ -7,6 +7,7 @@
     "dev": "node start.js",
     "dev:frontend": "vite",
     "server": "node server/index.js",
+    "start": "node server/production.js",
     "sam2": "cd sam2_server && pip install -r requirements.txt && python -m uvicorn app:app --port 3002 --reload",
     "build": "vite build",
     "preview": "vite preview",

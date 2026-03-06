@@ -6,3 +6,22 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# npm
+.npm-cache/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# IDE / 编辑器
+.cursor/
+.idea/
+*.swp
+*.swo
+
+# 与本地部署无关
+metadata.json
