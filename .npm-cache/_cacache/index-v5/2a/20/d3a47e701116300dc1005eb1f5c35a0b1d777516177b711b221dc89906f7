@@ -1,0 +1,2 @@
+
+07001667c31d9f75e0c7f6f98962bd29357117a3	{"key":"make-fetch-happen:request-cache:https://registry.npm.taobao.org/normalize-path","integrity":null,"time":1772772390522,"size":"262","metadata":{"time":1772772390522,"url":"https://registry.npm.taobao.org/normalize-path","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Fri, 06 Mar 2026 04:46:30 GMT","location":"https://registry.npmmirror.com/normalize-path"},"options":{"compress":true},"status":301}}

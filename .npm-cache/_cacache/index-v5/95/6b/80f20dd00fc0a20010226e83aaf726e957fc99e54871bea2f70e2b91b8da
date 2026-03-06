@@ -1,0 +1,2 @@
+
+1752b6dca7edb96c4693df135a399dfe98e9d5ef	{"key":"make-fetch-happen:request-cache:https://registry.npm.taobao.org/unzipper","integrity":null,"time":1772772388688,"size":"262","metadata":{"time":1772772388688,"url":"https://registry.npm.taobao.org/unzipper","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Fri, 06 Mar 2026 04:46:28 GMT","location":"https://registry.npmmirror.com/unzipper"},"options":{"compress":true},"status":301}}

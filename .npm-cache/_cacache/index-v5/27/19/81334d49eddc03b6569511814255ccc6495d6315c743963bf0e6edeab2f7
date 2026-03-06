@@ -1,0 +1,2 @@
+
+2cc49733ec649fb2280870c15036e16209928d0c	{"key":"make-fetch-happen:request-cache:https://registry.npm.taobao.org/path-is-absolute","integrity":null,"time":1772772392044,"size":"262","metadata":{"time":1772772392044,"url":"https://registry.npm.taobao.org/path-is-absolute","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Fri, 06 Mar 2026 04:46:31 GMT","location":"https://registry.npmmirror.com/path-is-absolute"},"options":{"compress":true},"status":301}}

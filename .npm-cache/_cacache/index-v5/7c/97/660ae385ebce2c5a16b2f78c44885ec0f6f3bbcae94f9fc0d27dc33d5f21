@@ -1,0 +1,2 @@
+
+e8f19f4421f2059572dd2a4b1816ca916fc57704	{"key":"make-fetch-happen:request-cache:https://registry.npm.taobao.org/lodash.groupby","integrity":null,"time":1772772392352,"size":"262","metadata":{"time":1772772392352,"url":"https://registry.npm.taobao.org/lodash.groupby","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Fri, 06 Mar 2026 04:46:31 GMT","location":"https://registry.npmmirror.com/lodash.groupby"},"options":{"compress":true},"status":301}}

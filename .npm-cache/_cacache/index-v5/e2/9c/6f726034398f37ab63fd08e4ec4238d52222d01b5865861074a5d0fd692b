@@ -1,0 +1,2 @@
+
+a9e6c1cfb0a4d2cc32413d2e8183debb1a675d68	{"key":"make-fetch-happen:request-cache:https://registry.npm.taobao.org/fstream","integrity":null,"time":1772772389748,"size":"262","metadata":{"time":1772772389748,"url":"https://registry.npm.taobao.org/fstream","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Fri, 06 Mar 2026 04:46:29 GMT","location":"https://registry.npmmirror.com/fstream"},"options":{"compress":true},"status":301}}

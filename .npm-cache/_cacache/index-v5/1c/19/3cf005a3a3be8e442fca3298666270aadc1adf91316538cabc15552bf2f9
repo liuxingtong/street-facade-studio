@@ -1,0 +1,2 @@
+
+9583871774ba187d7855405dc06e0c79a6d684b7	{"key":"make-fetch-happen:request-cache:https://registry.npm.taobao.org/glob","integrity":null,"time":1772772390519,"size":"262","metadata":{"time":1772772390519,"url":"https://registry.npm.taobao.org/glob","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Fri, 06 Mar 2026 04:46:30 GMT","location":"https://registry.npmmirror.com/glob"},"options":{"compress":true},"status":301}}

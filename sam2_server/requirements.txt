@@ -1,0 +1,10 @@
+# SAM2 via Hugging Face Transformers (no official SAM2 repo)
+transformers>=4.56.0
+torch>=2.0.0
+torchvision
+pillow>=9.0.0
+numpy
+opencv-python>=4.8.0
+fastapi>=0.100.0
+uvicorn[standard]>=0.22.0
+python-multipart

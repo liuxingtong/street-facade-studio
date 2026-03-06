@@ -1,0 +1,2 @@
+
+91dd31b24a11fd55dd879d3602bc22d0c17bfb26	{"key":"make-fetch-happen:request-cache:https://registry.npm.taobao.org/fast-csv","integrity":null,"time":1772772388681,"size":"262","metadata":{"time":1772772388681,"url":"https://registry.npm.taobao.org/fast-csv","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Fri, 06 Mar 2026 04:46:28 GMT","location":"https://registry.npmmirror.com/fast-csv"},"options":{"compress":true},"status":301}}

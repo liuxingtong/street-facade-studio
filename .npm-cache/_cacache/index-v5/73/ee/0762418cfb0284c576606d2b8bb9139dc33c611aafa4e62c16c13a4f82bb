@@ -1,0 +1,2 @@
+
+2b8e17a1cc7125f3f7c11e661210bd98669f6dbe	{"key":"make-fetch-happen:request-cache:https://registry.npm.taobao.org/readdir-glob","integrity":null,"time":1772772389727,"size":"262","metadata":{"time":1772772389727,"url":"https://registry.npm.taobao.org/readdir-glob","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Fri, 06 Mar 2026 04:46:29 GMT","location":"https://registry.npmmirror.com/readdir-glob"},"options":{"compress":true},"status":301}}

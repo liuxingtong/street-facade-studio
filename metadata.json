@@ -1,0 +1,5 @@
+{
+  "name": "Street Facade Analyzer & Designer",
+  "description": "Analyze street facade transparency, openness, and density from images, and generate design variations with adjustable gradients.",
+  "requestFramePermissions": []
+}

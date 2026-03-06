@@ -1,0 +1,10 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/doubao/*"
+  to = "/.netlify/functions/doubao-proxy/:splat"
+  status = 200
+  force = true

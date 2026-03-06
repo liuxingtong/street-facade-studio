@@ -1,0 +1,2 @@
+
+50e6559d9eb69156bcc38f75bc5ab911c2acb289	{"key":"make-fetch-happen:request-cache:https://registry.npm.taobao.org/process-nextick-args","integrity":null,"time":1772772392047,"size":"262","metadata":{"time":1772772392047,"url":"https://registry.npm.taobao.org/process-nextick-args","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Fri, 06 Mar 2026 04:46:31 GMT","location":"https://registry.npmmirror.com/process-nextick-args"},"options":{"compress":true},"status":301}}

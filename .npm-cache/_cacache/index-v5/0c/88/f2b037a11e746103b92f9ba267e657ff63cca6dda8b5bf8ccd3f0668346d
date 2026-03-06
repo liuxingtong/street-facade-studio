@@ -1,0 +1,2 @@
+
+6f4eb8db8c51d0075f0c992d399cd48690be67b9	{"key":"make-fetch-happen:request-cache:https://registry.npm.taobao.org/duplexer2","integrity":null,"time":1772772389748,"size":"262","metadata":{"time":1772772389748,"url":"https://registry.npm.taobao.org/duplexer2","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Fri, 06 Mar 2026 04:46:29 GMT","location":"https://registry.npmmirror.com/duplexer2"},"options":{"compress":true},"status":301}}

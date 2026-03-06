@@ -1,0 +1,2 @@
+
+bc33bdfdd6f8a3c0d758e1319b4b38d496386fe4	{"key":"make-fetch-happen:request-cache:https://registry.npm.taobao.org/core-util-is","integrity":null,"time":1772772392046,"size":"262","metadata":{"time":1772772392046,"url":"https://registry.npm.taobao.org/core-util-is","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Fri, 06 Mar 2026 04:46:31 GMT","location":"https://registry.npmmirror.com/core-util-is"},"options":{"compress":true},"status":301}}

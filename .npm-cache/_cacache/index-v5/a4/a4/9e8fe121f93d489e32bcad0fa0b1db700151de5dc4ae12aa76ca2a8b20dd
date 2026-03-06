@@ -1,0 +1,2 @@
+
+911ca613952240c04b033054281360212213f900	{"key":"make-fetch-happen:request-cache:https://registry.npm.taobao.org/big-integer","integrity":null,"time":1772772389786,"size":"262","metadata":{"time":1772772389786,"url":"https://registry.npm.taobao.org/big-integer","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Fri, 06 Mar 2026 04:46:29 GMT","location":"https://registry.npmmirror.com/big-integer"},"options":{"compress":true},"status":301}}

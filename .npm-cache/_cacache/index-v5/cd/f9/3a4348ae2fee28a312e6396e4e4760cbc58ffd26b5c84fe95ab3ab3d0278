@@ -1,0 +1,2 @@
+
+d81452d72b9e76d25fbb65568b09558d20c92b35	{"key":"make-fetch-happen:request-cache:https://registry.npm.taobao.org/string_decoder","integrity":null,"time":1772772392047,"size":"262","metadata":{"time":1772772392047,"url":"https://registry.npm.taobao.org/string_decoder","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Fri, 06 Mar 2026 04:46:31 GMT","location":"https://registry.npmmirror.com/string_decoder"},"options":{"compress":true},"status":301}}

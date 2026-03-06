@@ -1,0 +1,2 @@
+
+41d5f57cc472414d044f78525e857fdc6a6dcdd6	{"key":"make-fetch-happen:request-cache:https://registry.npm.taobao.org/isarray","integrity":null,"time":1772772392047,"size":"262","metadata":{"time":1772772392047,"url":"https://registry.npm.taobao.org/isarray","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Fri, 06 Mar 2026 04:46:31 GMT","location":"https://registry.npmmirror.com/isarray"},"options":{"compress":true},"status":301}}

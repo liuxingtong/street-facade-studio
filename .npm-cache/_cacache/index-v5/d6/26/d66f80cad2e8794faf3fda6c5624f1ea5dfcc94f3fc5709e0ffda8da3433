@@ -1,0 +1,2 @@
+
+a682ad9808a56cd6ecda1396b9d4c1149a83f905	{"key":"make-fetch-happen:request-cache:https://registry.npm.taobao.org/traverse","integrity":null,"time":1772772411594,"size":"262","metadata":{"time":1772772411593,"url":"https://registry.npm.taobao.org/traverse","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Fri, 06 Mar 2026 04:46:51 GMT","location":"https://registry.npmmirror.com/traverse"},"options":{"compress":true},"status":301}}
