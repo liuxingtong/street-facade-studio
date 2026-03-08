@@ -135,7 +135,7 @@ export default function App() {
       console.error("Analysis failed:", error);
       let msg = error instanceof Error ? error.message : String(error);
       if (msg.includes('fetch') || msg.includes('Failed to fetch')) {
-        msg = 'Cannot connect to SAM2. Run: cd sam2_server && pip install -r requirements.txt && python -m uvicorn app:app --port 3002';
+        msg = 'Cannot connect to segmentation service. Run: npm run sam2 (or cd sam2_server && python -m uvicorn app:app --port 3002)';
       }
       alert("Analysis failed: " + (msg || "Check SAM2 service."));
     } finally {

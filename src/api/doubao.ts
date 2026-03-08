@@ -116,7 +116,7 @@ export async function doubaoImageGenerate(
   const body: Record<string, unknown> = {
     model: config.imageEndpoint,
     prompt,
-    size: options?.size || '2K',
+    size: options?.size || '4K',
     response_format: 'b64_json',
     seed,
   };

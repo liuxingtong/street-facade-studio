@@ -46,7 +46,7 @@ export async function sam2Segment(imageDataUrl: string): Promise<Sam2SegmentResu
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes('fetch') || msg.includes('Failed to fetch') || msg.includes('abort')) {
       throw new Error(
-        'Cannot connect to SAM2. Ensure SAM2 is running: npm run sam2 (or cd sam2_server && python -m uvicorn app:app --port 3002)'
+        'Cannot connect to segmentation service. Ensure it is running: npm run sam2 (or cd sam2_server && python -m uvicorn app:app --port 3002)'
       );
     }
     throw e;

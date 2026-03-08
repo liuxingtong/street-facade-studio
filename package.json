@@ -4,11 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "start:all": "node scripts/setup-and-start.js",
     "dev": "node start.js",
     "dev:frontend": "vite",
     "server": "node server/index.js",
     "start": "node server/production.js",
     "sam2": "cd sam2_server && pip install -r requirements.txt && python -m uvicorn app:app --port 3002 --reload",
+    "batch": "node scripts/batch-process.js",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
