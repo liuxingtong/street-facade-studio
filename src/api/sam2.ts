@@ -5,30 +5,56 @@
 
 const SAM2_BASE = (typeof process !== 'undefined' && process.env?.VITE_SAM2_URL) || '/api/sam2';
 
-export interface ColorRawVars {
-  HueEntropy: number;
-  SaturationMean: number;
-  HueDiversity: number;
-  NonzeroBins: number;
+export interface MaskItem {
+  id: number;
+  polygon: number[][];
+  area: number;
+  bbox: number[];
 }
 
-export interface Sam2SegmentResult {
-  segmentation_image_base64: string;
-  Transparency: number;
-  SignageScale: number;
-  ColorRichness: number;
-  ColorRichnessRaw?: number;
-  ColorRawVars?: ColorRawVars;
-  HueHistogram: number[];
-  StyleDescription: string;
-  Reasoning: string;
+export interface SegmentMasksResult {
+  masks: MaskItem[];
+  width: number;
+  height: number;
 }
 
-export async function sam2Segment(imageDataUrl: string): Promise<Sam2SegmentResult> {
+/** 点击任意位置分割该区域，实现全图可标注 */
+export async function sam2SegmentAtPoint(
+  imageDataUrl: string,
+  x: number,
+  y: number
+): Promise<{ mask: MaskItem | null; width: number; height: number }> {
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 120000);
+  const t = setTimeout(() => ctrl.abort(), 30000);
   try {
-    const res = await fetch(`${SAM2_BASE}/segment`, {
+    const res = await fetch(`${SAM2_BASE}/segment-at-point`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_base64: imageDataUrl, x: Math.round(x), y: Math.round(y) }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    const data = await res.json();
+    if (!res.ok) {
+      const msg = data?.detail || data?.error || JSON.stringify(data);
+      throw new Error(typeof msg === 'string' ? msg : msg);
+    }
+    return data as { mask: MaskItem | null; width: number; height: number };
+  } catch (e) {
+    clearTimeout(t);
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('fetch') || msg.includes('Failed to fetch') || msg.includes('abort')) {
+      throw new Error('Cannot connect to segmentation service.');
+    }
+    throw e;
+  }
+}
+
+export async function sam2SegmentMasks(imageDataUrl: string): Promise<SegmentMasksResult> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 180000);
+  try {
+    const res = await fetch(`${SAM2_BASE}/segment-masks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image_base64: imageDataUrl }),
@@ -40,7 +66,7 @@ export async function sam2Segment(imageDataUrl: string): Promise<Sam2SegmentResu
       const msg = data?.detail || data?.error || JSON.stringify(data);
       throw new Error(typeof msg === 'string' ? msg : msg);
     }
-    return data as Sam2SegmentResult;
+    return data as SegmentMasksResult;
   } catch (e) {
     clearTimeout(t);
     const msg = e instanceof Error ? e.message : String(e);
@@ -51,6 +77,13 @@ export async function sam2Segment(imageDataUrl: string): Promise<Sam2SegmentResu
     }
     throw e;
   }
+}
+
+export interface ColorRawVars {
+  HueEntropy: number;
+  SaturationMean: number;
+  HueDiversity: number;
+  NonzeroBins: number;
 }
 
 /** 仅用 OpenCV 统计整图色彩丰富度 */

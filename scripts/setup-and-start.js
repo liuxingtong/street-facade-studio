@@ -3,7 +3,7 @@
  * 一键完成：安装依赖、配置 .env、启动全部服务
  * 用法：npm run start:all
  *
- * SegFormer 模型在首次推理时自动从 HuggingFace 下载，无需手动操作。
+ * SAM2 模型在启动时自动从 HuggingFace 下载，无需手动操作。
  */
 import { spawn, execSync } from 'child_process';
 import { existsSync, copyFileSync } from 'fs';
@@ -48,9 +48,10 @@ async function main() {
   const childEnv = { ...process.env };
   if (!childEnv.HF_ENDPOINT) childEnv.HF_ENDPOINT = 'https://hf-mirror.com';
 
-  const opts = { stdio: 'inherit', cwd: ROOT, env: childEnv };
+  const isWin = process.platform === 'win32';
+  const opts = { stdio: 'inherit', cwd: ROOT, env: childEnv, shell: true };
   const server = spawn('node', ['server/index.js'], opts);
-  const vite   = spawn('npx',  ['vite'], opts);
+  const vite   = spawn('npx', ['vite'], opts);
   const seg    = spawn('python', ['-m', 'uvicorn', 'app:app', '--port', '3002', '--host', '127.0.0.1'], {
     ...opts, cwd: SAM2,
   });
@@ -86,7 +87,7 @@ async function main() {
   console.log('  豆包代理: http://localhost:3001');
   console.log('  分割服务: http://localhost:3002');
   console.log('  前    端: http://localhost:3000');
-  console.log('\n  (首次推理时 SegFormer 自动下载模型约 370MB)\n');
+  console.log('\n  (启动时 SAM2 自动下载约 1GB，请耐心等待)\n');
   console.log('按 Ctrl+C 停止全部服务\n');
 }
 

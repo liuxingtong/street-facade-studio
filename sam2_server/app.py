@@ -1,10 +1,9 @@
 """
-街景立面分割服务 - SegFormer + ADE20K
-使用 HuggingFace SegFormer，pip install transformers 即可，无需外部仓库。
+街景立面分割服务 - SAM2 + 色彩丰富度
 
-关键修正：
-  - glass 类别改为 windowpane;window (ID=8)，原 ID=113 是饮用玻璃杯，不适合立面分析
-  - signboard;sign (ID=43) 不变
+- /segment-masks: SAM2 自动切割，返回可点击的 mask 列表（按面积过滤、数量限制）
+- /segment-at-point: 点击任意位置，SAM2 点提示分割该区域（全图可标注）
+- /color-richness: 色彩丰富度
 """
 from __future__ import annotations
 
@@ -21,157 +20,64 @@ from typing import List, Tuple
 import cv2
 import numpy as np
 import torch
-import torch.nn.functional as F
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 from pydantic import BaseModel
 
-# 目标类别名称（与模型 id2label 匹配，忽略大小写、支持部分匹配）
-TARGET_CLASSES = {
-    "window": "Transparency",   # windowpane;window → 透明度
-    "signboard": "SignageScale", # signboard;sign → 招牌
-}
+# SAM2 配置
+SAM2_MODEL = os.environ.get("SAM2_MODEL", "facebook/sam2.1-hiera-base-plus")
+SAM2_MAX_MASKS = int(os.environ.get("SAM2_MAX_MASKS", "80"))  # 最多返回 mask 数量
+SAM2_MIN_AREA_RATIO = float(os.environ.get("SAM2_MIN_AREA_RATIO", "0.002"))  # 最小面积占比（0.2%）
+SAM2_MAX_SIZE = int(os.environ.get("SAM2_MAX_SIZE", "512"))  # 输入长边上限，降低 GPU 消耗
 
-# 运行时从模型 config 解析出的 {class_name: id}，启动后填充
-_label2id: dict[str, int] = {}
-_id2label: dict[int, str] = {}
-
-# 配置
-SEGFORMER_MODEL = os.environ.get("SEGFORMER_MODEL", "nvidia/segformer-b5-finetuned-ade-640-640")
-SEGFORMER_DEVICE = os.environ.get("SEGFORMER_DEVICE", "").lower()  # "cpu" 强制 CPU
-USE_FP16 = os.environ.get("SEGFORMER_FP16", "1").lower() in ("1", "true", "yes")
-SEG_MAX_SIZE = int(os.environ.get("SEGFORMER_MAX_SIZE", "1024"))  # 输入长边上限（防 OOM）
-
-# 延迟加载
-_processor = None
-_model = None
+_sam2_generator = None
+_sam2_processor = None
+_sam2_point_model = None
 
 
-def _get_device() -> torch.device:
-    if SEGFORMER_DEVICE == "cpu":
-        return torch.device("cpu")
-    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def _resize_for_sam2(img: Image.Image) -> Tuple[Image.Image, float, int, int]:
+    """限制长边为 SAM2_MAX_SIZE，返回 (resized_img, scale, orig_w, orig_h)"""
+    w, h = img.size
+    orig_w, orig_h = w, h
+    if max(w, h) <= SAM2_MAX_SIZE:
+        return img, 1.0, orig_w, orig_h
+    scale = SAM2_MAX_SIZE / max(w, h)
+    new_w = int(w * scale)
+    new_h = int(h * scale)
+    return img.resize((new_w, new_h), Image.Resampling.LANCZOS), scale, orig_w, orig_h
 
 
-def _resolve_target_ids():
-    """从模型 config 的 id2label 解析目标类别 ID，支持部分名称匹配。"""
-    global _label2id, _id2label
-    if not _model:
-        return
-    raw = getattr(_model.config, "id2label", {})
-    _id2label = {int(k): v.lower() for k, v in raw.items()}
-    _label2id = {v: int(k) for k, v in _id2label.items()}
-
-    print("\n[SegFormer] 目标类别 ID 解析结果：")
-    for keyword, metric in TARGET_CLASSES.items():
-        matched = [(label, idx) for label, idx in _label2id.items() if keyword in label]
-        if matched:
-            for label, idx in matched:
-                print(f"  {metric:14s} ← [{idx:3d}] {label}")
-        else:
-            print(f"  {metric:14s} ← 未找到包含 '{keyword}' 的类别")
-    print()
-
-
-def _get_target_id(keyword: str) -> int:
-    """按关键词查找类别 ID（首个匹配）。找不到时 fallback 到 ADE20K 已知 ID。"""
-    fallbacks = {"window": 8, "signboard": 43}
-    for label, idx in _label2id.items():
-        if keyword in label:
-            return idx
-    return fallbacks.get(keyword, -1)
-
-
-def get_model():
-    global _processor, _model
-    if _processor is None:
-        from transformers import SegformerImageProcessor, SegformerForSemanticSegmentation
-
-        device = _get_device()
-        print(f"[SegFormer] 加载模型: {SEGFORMER_MODEL}  device={device}")
-        _processor = SegformerImageProcessor.from_pretrained(SEGFORMER_MODEL)
-        _model = SegformerForSemanticSegmentation.from_pretrained(SEGFORMER_MODEL)
-        _model.eval()
-        if USE_FP16 and device.type == "cuda":
-            _model = _model.half()
-        _model = _model.to(device)
-        _resolve_target_ids()
-        print("[SegFormer] 模型已就绪。")
-    return _processor, _model
-
-
-def _resize_if_needed(img: np.ndarray) -> np.ndarray:
-    """限制长边，避免 OOM"""
-    h, w = img.shape[:2]
-    if max(h, w) <= SEG_MAX_SIZE:
-        return img
-    scale = SEG_MAX_SIZE / max(h, w)
-    return cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_LINEAR)
-
-
-def run_segformer(img_np: np.ndarray) -> np.ndarray:
-    """
-    运行 SegFormer 推理，返回语义分割图 (H×W)，值为 ADE20K 0-based 类别 ID (0-149)。
-    """
-    processor, model = get_model()
-    device = next(model.parameters()).device
-    dtype = next(model.parameters()).dtype
-
-    img_pil = Image.fromarray(img_np)
-    ori_h, ori_w = img_np.shape[:2]
-
-    inputs = processor(images=img_pil, return_tensors="pt")
-    pixel_values = inputs["pixel_values"].to(device=device, dtype=dtype)
-
-    with torch.no_grad():
-        outputs = model(pixel_values=pixel_values)
-        logits = outputs.logits  # (1, num_classes, H/4, W/4)
-        upsampled = F.interpolate(
-            logits.float(),
-            size=(ori_h, ori_w),
-            mode="bilinear",
-            align_corners=False,
+def get_sam2_generator():
+    """SAM2 mask-generation pipeline，首次调用时加载"""
+    global _sam2_generator
+    if _sam2_generator is None:
+        device = 0 if torch.cuda.is_available() else -1
+        print(f"[SAM2] 加载模型: {SAM2_MODEL}  device={device}")
+        _sam2_generator = __import__("transformers").pipeline(
+            "mask-generation",
+            model=SAM2_MODEL,
+            device=device,
         )
-        seg = upsampled.argmax(dim=1).squeeze(0).cpu().numpy().astype(np.int32)
-
-    return seg
-
-
-def compute_glass_signboard_area(seg: np.ndarray) -> dict:
-    """面积统计（ID 从模型 config 动态解析）"""
-    total = seg.size
-    window_id = _get_target_id("window")
-    signboard_id = _get_target_id("signboard")
-    window_pixels = int((seg == window_id).sum()) if window_id >= 0 else 0
-    signboard_pixels = int((seg == signboard_id).sum()) if signboard_id >= 0 else 0
-    return {
-        "window_pixels": window_pixels,
-        "signboard_pixels": signboard_pixels,
-        "window_ratio": window_pixels / max(1, total),
-        "signboard_ratio": signboard_pixels / max(1, total),
-    }
+        print("[SAM2] 模型已就绪。")
+    return _sam2_generator
 
 
-def _print_seg_stats(seg: np.ndarray):
-    """在控制台打印前 10 个最大面积类别的名称和占比。"""
-    total = seg.size
-    unique, counts = np.unique(seg, return_counts=True)
-    order = np.argsort(counts)[::-1]
-    print("\n[SegFormer] 本次识别结果（面积前10）：")
-    print(f"  {'ID':>4}  {'类别名':<35} {'像素数':>8}  {'占比':>6}")
-    print(f"  {'-'*4}  {'-'*35} {'-'*8}  {'-'*6}")
-    for i in order[:10]:
-        cid = int(unique[i])
-        cnt = int(counts[i])
-        label = _id2label.get(cid, f"id={cid}")
-        pct = cnt / total * 100
-        marker = ""
-        for kw in TARGET_CLASSES:
-            if kw in label:
-                marker = " ◀"
-        print(f"  {cid:>4}  {label:<35} {cnt:>8}  {pct:>5.1f}%{marker}")
-    print()
+def get_sam2_point_model():
+    """SAM2 点提示模型，用于点击任意位置分割"""
+    global _sam2_processor, _sam2_point_model
+    if _sam2_point_model is None:
+        from transformers import Sam2Processor, Sam2Model
+        device = 0 if torch.cuda.is_available() else -1
+        if device >= 0:
+            device = f"cuda:{device}"
+        else:
+            device = "cpu"
+        print(f"[SAM2] 加载点提示模型: {SAM2_MODEL}  device={device}")
+        _sam2_processor = Sam2Processor.from_pretrained(SAM2_MODEL)
+        _sam2_point_model = Sam2Model.from_pretrained(SAM2_MODEL).to(device)
+        print("[SAM2] 点提示模型已就绪。")
+    return _sam2_processor, _sam2_point_model
 
 
 def compute_color_richness_and_histogram(img: np.ndarray) -> Tuple[int, float, List[float], dict]:
@@ -200,71 +106,9 @@ def compute_color_richness_and_histogram(img: np.ndarray) -> Tuple[int, float, L
     return cr, float(raw), h_hist_18, raw_vars
 
 
-def build_overlay_and_metrics(img: np.ndarray, seg: np.ndarray) -> Tuple[Image.Image, dict]:
-    """
-    从 SegFormer 分割结果生成彩色叠加图与立面指标。
-    windowpane → 蓝色，signboard → 红色
-    """
-    _print_seg_stats(seg)
-
-    window_id = _get_target_id("window")
-    signboard_id = _get_target_id("signboard")
-    window_label = _id2label.get(window_id, "windowpane")
-    signboard_label = _id2label.get(signboard_id, "signboard")
-
-    h, w = img.shape[:2]
-    overlay = np.zeros((h, w, 4), dtype=np.uint8)
-    overlay[:, :, :3] = (img.astype(np.float32) * 0.5).astype(np.uint8)
-    overlay[:, :, 3] = 255
-
-    window_mask = seg == window_id
-    signboard_mask = seg == signboard_id
-
-    # 蓝色 = 玻璃窗
-    overlay[window_mask, 0] = np.uint8(0.12 * 255)
-    overlay[window_mask, 1] = np.uint8(0.56 * 255)
-    overlay[window_mask, 2] = np.uint8(1.0 * 255)
-    overlay[window_mask, 3] = np.uint8(0.75 * 255)
-
-    # 红色 = 招牌
-    overlay[signboard_mask, 0] = np.uint8(1.0 * 255)
-    overlay[signboard_mask, 1] = np.uint8(0.2 * 255)
-    overlay[signboard_mask, 2] = np.uint8(0.2 * 255)
-    overlay[signboard_mask, 3] = np.uint8(0.75 * 255)
-
-    area_stats = compute_glass_signboard_area(seg)
-    total_area = h * w
-    window_pixels = area_stats["window_pixels"]
-    signboard_pixels = area_stats["signboard_pixels"]
-
-    transparency = min(100, int(100 * window_pixels / max(1, total_area)))
-    signage_ratio = signboard_pixels / max(1, total_area)
-    signage_scale = min(100, int(100 * signage_ratio * 3))
-
-    color_richness, color_richness_raw, hue_histogram, color_raw_vars = compute_color_richness_and_histogram(img)
-
-    metrics = {
-        "Transparency": transparency,
-        "SignageScale": signage_scale,
-        "ColorRichness": color_richness,
-        "ColorRichnessRaw": round(color_richness_raw, 4),
-        "ColorRawVars": color_raw_vars,
-        "HueHistogram": hue_histogram,
-        "StyleDescription": "Facade analysis via SegFormer ADE20K semantic segmentation",
-        "Reasoning": (
-            f"Window/glass {transparency}%, signage {signage_scale}%. "
-            f"SegFormer B5 ADE20K: '{window_label}'(id={window_id}), '{signboard_label}'(id={signboard_id}). "
-            f"Color richness from OpenCV hue entropy."
-        ),
-    }
-
-    overlay_pil = Image.fromarray(overlay).convert("RGB")
-    return overlay_pil, metrics
-
-
 # ─── FastAPI ─────────────────────────────────────────────────────────────────
 
-app = FastAPI(title="Facade Segmentation Service (SegFormer)")
+app = FastAPI(title="Facade Segmentation Service (SAM2)")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -272,22 +116,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-class SegmentRequest(BaseModel):
-    image_base64: str
-
-
-class SegmentResponse(BaseModel):
-    segmentation_image_base64: str
-    Transparency: int
-    SignageScale: int
-    ColorRichness: int
-    ColorRichnessRaw: float
-    ColorRawVars: dict
-    HueHistogram: List[float]
-    StyleDescription: str
-    Reasoning: str
 
 
 class ColorRichnessRequest(BaseModel):
@@ -321,8 +149,45 @@ def color_richness(request: ColorRichnessRequest):
     )
 
 
-@app.post("/segment", response_model=SegmentResponse)
-def segment(request: SegmentRequest):
+# ─── SAM2 segment-masks ─────────────────────────────────────────────────────
+
+class SegmentMasksRequest(BaseModel):
+    image_base64: str
+
+
+class MaskItem(BaseModel):
+    id: int
+    polygon: List[List[int]]  # [[x,y], ...]
+    area: int
+    bbox: List[int]  # [x, y, w, h]
+
+
+class SegmentMasksResponse(BaseModel):
+    masks: List[MaskItem]
+    width: int
+    height: int
+
+
+def _mask_to_polygon(mask_np: np.ndarray) -> Tuple[List[List[int]], int, List[int]]:
+    """从二值 mask 提取 polygon、面积、bbox"""
+    mask_uint8 = (mask_np * 255).astype(np.uint8) if mask_np.dtype != np.uint8 else mask_np
+    contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return [], 0, [0, 0, 0, 0]
+    areas = [cv2.contourArea(c) for c in contours]
+    idx = int(np.argmax(areas))
+    cnt = contours[idx]
+    area = int(areas[idx])
+    x, y, w, h = cv2.boundingRect(cnt)
+    peri = cv2.arcLength(cnt, True)
+    epsilon = max(2, 0.002 * peri)
+    approx = cv2.approxPolyDP(cnt, epsilon, True)
+    polygon = [[int(p[0][0]), int(p[0][1])] for p in approx]
+    return polygon, area, [int(x), int(y), int(w), int(h)]
+
+
+@app.post("/segment-masks", response_model=SegmentMasksResponse)
+def segment_masks(request: SegmentMasksRequest):
     raw = request.image_base64.strip()
     if raw.startswith("data:"):
         raw = raw.split(",", 1)[-1]
@@ -330,44 +195,157 @@ def segment(request: SegmentRequest):
         img_bytes = base64.b64decode(raw)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"无效的 base64: {e}")
-
     img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-    img_np = np.array(img)
-    img_np = _resize_if_needed(img_np)
+    img_small, scale, orig_w, orig_h = _resize_for_sam2(img)
+    h_s, w_s = img_small.height, img_small.width
+    total_area = h_s * w_s
+    min_area = int(total_area * SAM2_MIN_AREA_RATIO)
 
     try:
-        seg = run_segformer(img_np)
-        overlay_pil, metrics = build_overlay_and_metrics(img_np, seg)
+        generator = get_sam2_generator()
+        outputs = generator(img_small, points_per_batch=64, pred_iou_thresh=0.82)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"分割失败: {e}")
+        raise HTTPException(status_code=500, detail=f"SAM2 分割失败: {e}")
 
-    buf = io.BytesIO()
-    overlay_pil.save(buf, format="PNG")
-    seg_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+    masks_tensor = outputs.get("masks")
+    scores_tensor = outputs.get("scores", None)
+    if masks_tensor is None or len(masks_tensor) == 0:
+        return SegmentMasksResponse(masks=[], width=orig_w, height=orig_h)
 
-    return SegmentResponse(
-        segmentation_image_base64=f"data:image/png;base64,{seg_b64}",
-        **metrics,
-    )
+    inv_scale = 1.0 / scale
+    mask_list = []
+    scores = scores_tensor.cpu().numpy().tolist() if scores_tensor is not None else [1.0] * len(masks_tensor)
+    for i, m in enumerate(masks_tensor):
+        mask_np = m.cpu().numpy() if hasattr(m, "cpu") else np.array(m)
+        if mask_np.dtype == bool:
+            mask_np = mask_np.astype(np.uint8) * 255
+        polygon, area, bbox = _mask_to_polygon(mask_np)
+        if area < min_area or len(polygon) < 3:
+            continue
+        polygon_orig = [[int(x * inv_scale), int(y * inv_scale)] for x, y in polygon]
+        area_orig = int(area * inv_scale * inv_scale)
+        bbox_orig = [int(bbox[0] * inv_scale), int(bbox[1] * inv_scale), int(bbox[2] * inv_scale), int(bbox[3] * inv_scale)]
+        score = scores[i] if i < len(scores) else 1.0
+        mask_list.append({"polygon": polygon_orig, "area": area_orig, "bbox": bbox_orig, "score": float(score)})
+
+    mask_list.sort(key=lambda x: x["area"], reverse=True)
+    mask_list = mask_list[:SAM2_MAX_MASKS]
+
+    result = [
+        MaskItem(id=i, polygon=m["polygon"], area=m["area"], bbox=m["bbox"])
+        for i, m in enumerate(mask_list)
+    ]
+    return SegmentMasksResponse(masks=result, width=orig_w, height=orig_h)
+
+
+# ─── SAM2 segment-at-point（全图可标注）────────────────────────────────────────
+
+class SegmentAtPointRequest(BaseModel):
+    image_base64: str
+    x: int  # 原图坐标
+    y: int
+
+
+class SegmentAtPointResponse(BaseModel):
+    mask: MaskItem | None  # 成功时返回，失败时 None
+    width: int
+    height: int
+
+
+@app.post("/segment-at-point", response_model=SegmentAtPointResponse)
+def segment_at_point(request: SegmentAtPointRequest):
+    """点击任意位置，SAM2 点提示分割该区域，实现全图可标注"""
+    raw = request.image_base64.strip()
+    if raw.startswith("data:"):
+        raw = raw.split(",", 1)[-1]
+    try:
+        img_bytes = base64.b64decode(raw)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"无效的 base64: {e}")
+    img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    orig_w, orig_h = img.size
+    img_small, scale, orig_w, orig_h = _resize_for_sam2(img)
+    x_small = int(request.x * scale)
+    y_small = int(request.y * scale)
+    x_small = max(0, min(img_small.width - 1, x_small))
+    y_small = max(0, min(img_small.height - 1, y_small))
+
+    try:
+        processor, model = get_sam2_point_model()
+        input_points = [[[[x_small, y_small]]]]
+        input_labels = [[[1]]]
+        print(f"[SAM2 point] img={img_small.size} point=({x_small},{y_small}) device={model.device}")
+        inputs_cpu = processor(
+            images=img_small,
+            input_points=input_points,
+            input_labels=input_labels,
+            return_tensors="pt",
+        )
+        original_sizes = inputs_cpu["original_sizes"].clone()
+        inputs_dev = inputs_cpu.to(model.device)
+        with torch.no_grad():
+            outputs = model(**inputs_dev, multimask_output=False)
+        print(f"[SAM2 point] pred_masks shape: {outputs.pred_masks.shape}")
+        masks = processor.post_process_masks(
+            outputs.pred_masks.cpu(), original_sizes
+        )[0]
+        print(f"[SAM2 point] post_process masks shape: {masks.shape}")
+    except Exception as e:
+        import traceback
+        print(f"[SAM2 point] ERROR: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"SAM2 点提示分割失败: {e}")
+
+    if masks is None or masks.numel() == 0:
+        print("[SAM2 point] no masks returned")
+        return SegmentAtPointResponse(mask=None, width=orig_w, height=orig_h)
+
+    # masks shape: [num_objects, num_masks, H, W] after post_process_masks
+    # with multimask_output=False: [1, 1, H, W]
+    mask_np = masks[0, 0].numpy()
+    if mask_np.dtype == bool:
+        mask_np = mask_np.astype(np.uint8) * 255
+    polygon, area, bbox = _mask_to_polygon(mask_np)
+    if area < 10 or len(polygon) < 3:
+        return SegmentAtPointResponse(mask=None, width=orig_w, height=orig_h)
+
+    inv_scale = 1.0 / scale
+    polygon_orig = [[int(x * inv_scale), int(y * inv_scale)] for x, y in polygon]
+    area_orig = int(area * inv_scale * inv_scale)
+    bbox_orig = [
+        int(bbox[0] * inv_scale),
+        int(bbox[1] * inv_scale),
+        int(bbox[2] * inv_scale),
+        int(bbox[3] * inv_scale),
+    ]
+    mask_item = MaskItem(id=0, polygon=polygon_orig, area=area_orig, bbox=bbox_orig)
+    return SegmentAtPointResponse(mask=mask_item, width=orig_w, height=orig_h)
+
+
+@app.get("/")
+def root():
+    return {"service": "Facade Segmentation (SAM2)", "docs": "/docs", "health": "/health"}
+
+
+@app.get("/favicon.ico")
+def favicon():
+    from fastapi.responses import Response
+    return Response(status_code=204)
 
 
 @app.get("/health")
 def health():
-    loaded = _processor is not None
     return {
         "status": "ok",
-        "model": SEGFORMER_MODEL,
-        "model_loaded": loaded,
-        "device": str(_get_device()),
-        "fp16": USE_FP16,
+        "sam2_loaded": _sam2_generator is not None,
+        "device": "cuda" if torch.cuda.is_available() else "cpu",
     }
 
 
 @app.on_event("startup")
-def preload_model():
-    """启动时预加载模型，便于在终端看到下载进度"""
-    print("\n[SegFormer] 预加载模型（首次会从镜像下载约 370MB）...")
+def on_startup():
+    """启动时预加载 SAM2 模型"""
+    print("\n[SAM2] 预加载模型（首次会从镜像下载约 1GB）...")
     try:
-        get_model()
+        get_sam2_generator()
     except Exception as e:
-        print(f"[SegFormer] 预加载失败（首次推理时会重试）: {e}\n")
+        print(f"[SAM2] 预加载失败（首次推理时会重试）: {e}\n")

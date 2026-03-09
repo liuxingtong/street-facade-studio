@@ -6,6 +6,8 @@ import ExcelJS from 'exceljs';
 export interface ExportData {
   /** Current image (data URL) - the analyzed or generated image */
   imageDataUrl: string;
+  /** Annotated segmentation map (data URL) - 手动标注后的分割图，可选 */
+  segmentationImageUrl?: string;
   /** ISO timestamp of the run */
   timestamp: string;
   /** Metrics from SAM2 analysis */
@@ -69,7 +71,7 @@ export async function exportToXlsx(data: ExportData, filename?: string): Promise
   ws.getColumn(1).width = 22;
   ws.getColumn(2).width = 60;
 
-  const imageStartRow = rows.length;
+  let imageStartRow = rows.length;
   try {
     const { buffer, ext } = base64ToArrayBuffer(data.imageDataUrl);
     const imgId = wb.addImage({
@@ -83,6 +85,26 @@ export async function exportToXlsx(data: ExportData, filename?: string): Promise
   } catch (e) {
     console.warn('Could not embed image:', e);
     ws.getCell(imageStartRow + 1, 1).value = '(Image embed failed)';
+  }
+
+  if (data.segmentationImageUrl) {
+    imageStartRow += 20;
+    ws.getCell(imageStartRow, 1).value = 'Annotated Segmentation Map';
+    ws.getCell(imageStartRow + 1, 1).value = '(embedded below)';
+    try {
+      const { buffer, ext } = base64ToArrayBuffer(data.segmentationImageUrl);
+      const segId = wb.addImage({
+        buffer,
+        extension: ext as 'png' | 'jpeg' | 'gif',
+      });
+      ws.addImage(segId, {
+        tl: { col: 0, row: imageStartRow + 2 },
+        ext: { width: 400, height: 300 },
+      });
+    } catch (e) {
+      console.warn('Could not embed segmentation map:', e);
+      ws.getCell(imageStartRow + 2, 1).value = '(Segmentation map embed failed)';
+    }
   }
 
   const blob = await wb.xlsx.writeBuffer();

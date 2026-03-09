@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { doubaoImageGenerate } from './api/doubao';
-import { sam2Segment, sam2ColorRichnessFull } from './api/sam2';
+import { sam2SegmentMasks, sam2SegmentAtPoint, sam2ColorRichnessFull, type MaskItem } from './api/sam2';
 import { exportToXlsx } from './utils/exportXlsx';
 import { 
   Upload, 
@@ -14,21 +14,15 @@ import {
   Maximize2, 
   Store, 
   RefreshCw, 
-  Plus, 
-  Minus,
   Image as ImageIcon,
   Loader2,
   Download,
-  Edit3,
   Check,
-  Eraser,
   FileSpreadsheet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Stage, Layer, Image as KonvaImage, Line } from 'react-konva';
-import useImage from 'use-image';
 
 // Utility for tailwind classes
 function cn(...inputs: ClassValue[]) {
@@ -68,19 +62,18 @@ export default function App() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [metrics, setMetrics] = useState<FacadeMetrics | null>(null);
-  const [gradient, setGradient] = useState(10);
+  const [segmentMasks, setSegmentMasks] = useState<{ masks: MaskItem[]; width: number; height: number } | null>(null);
+  const [maskLabels, setMaskLabels] = useState<Record<number, 'glass' | 'signboard'>>({});
+  const [labelMode, setLabelMode] = useState<'glass' | 'signboard' | null>(null);
+  const [annotatedOverlayUrl, setAnnotatedOverlayUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generations, setGenerations] = useState<GenerationResult[]>([]);
   const [activeTab, setActiveTab] = useState<'analysis' | 'generation'>('analysis');
-  const [isEditingSeg, setIsEditingSeg] = useState(false);
-  const [brushColor, setBrushColor] = useState('#3b82f6'); // Default Blue
-  const [lines, setLines] = useState<any[]>([]);
   const [customPrompt, setCustomPrompt] = useState('');
   const [lastAnalysisTimestamp, setLastAnalysisTimestamp] = useState<string | null>(null);
   const [lastGenerationMeta, setLastGenerationMeta] = useState<{ prompt: string; model: string; seed: number; timestamp: string } | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const stageRef = useRef<any>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -90,6 +83,10 @@ export default function App() {
         const result = event.target?.result as string;
         setSelectedImage(result);
         setMetrics(null);
+        setSegmentMasks(null);
+        setMaskLabels({});
+        setLabelMode(null);
+        setAnnotatedOverlayUrl(null);
         setGenerations([]);
         setActiveTab('analysis');
       };
@@ -111,36 +108,147 @@ export default function App() {
     };
   };
 
-  const analyzeImage = async (customSegMap?: string) => {
+  const startDirectLabeling = () => {
+    if (!selectedImage) return;
+    const img = new Image();
+    img.onload = () => {
+      setSegmentMasks({ masks: [], width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.src = selectedImage;
+  };
+
+  const nextIdRef = useRef(0);
+  const handleAddMaskAtPoint = async (x: number, y: number) => {
+    if (!selectedImage || !segmentMasks) return;
+    setIsAnalyzing(true);
+    try {
+      const res = await sam2SegmentAtPoint(selectedImage, x, y);
+      if (res.mask) {
+        setSegmentMasks((prev) => {
+          if (!prev) return prev;
+          const nextId = prev.masks.length > 0
+            ? Math.max(...prev.masks.map((m) => m.id)) + 1
+            : 0;
+          nextIdRef.current = nextId;
+          return {
+            ...prev,
+            masks: [...prev.masks, { ...res.mask!, id: nextId }],
+          };
+        });
+        if (labelMode) {
+          setMaskLabels((prev) => ({ ...prev, [nextIdRef.current]: labelMode }));
+        }
+      } else {
+        alert('未能分割该区域，请尝试点击其他位置');
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      alert('分割失败: ' + msg);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleMaskClick = (maskId: number) => {
+    if (!labelMode) return;
+    const current = maskLabels[maskId];
+    if (current === labelMode) {
+      setMaskLabel(maskId, null);
+    } else {
+      setMaskLabel(maskId, labelMode);
+    }
+  };
+
+  const runSegmentMasks = async () => {
     if (!selectedImage) return;
     setIsAnalyzing(true);
-    if (!customSegMap) setMetrics(null);
-
+    setMetrics(null);
+    setSegmentMasks(null);
+    setMaskLabels({});
+    setLabelMode(null);
+    setAnnotatedOverlayUrl(null);
     try {
-      const result = await sam2Segment(selectedImage);
-      setMetrics({
-        Transparency: result.Transparency,
-        SignageScale: result.SignageScale,
-        ColorRichness: result.ColorRichness,
-        ColorRichnessRaw: result.ColorRichnessRaw,
-        ColorRawVars: result.ColorRawVars,
-        HueHistogram: result.HueHistogram,
-        StyleDescription: result.StyleDescription,
-        Reasoning: result.Reasoning,
-        segmentationImageUrl: customSegMap ?? result.segmentation_image_base64,
-      });
-      setLastAnalysisTimestamp(new Date().toISOString());
-      setActiveTab('analysis');
+      const result = await sam2SegmentMasks(selectedImage);
+      setSegmentMasks(result);
     } catch (error: unknown) {
-      console.error("Analysis failed:", error);
+      console.error("Segment failed:", error);
       let msg = error instanceof Error ? error.message : String(error);
       if (msg.includes('fetch') || msg.includes('Failed to fetch')) {
         msg = 'Cannot connect to segmentation service. Run: npm run sam2 (or cd sam2_server && python -m uvicorn app:app --port 3002)';
       }
-      alert("Analysis failed: " + (msg || "Check SAM2 service."));
+      alert("分割失败: " + (msg || "Check SAM2 service."));
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const buildAnnotatedOverlay = (imgUrl: string, masks: MaskItem[], labels: Record<number, 'glass' | 'signboard'>) => {
+    return new Promise<string>((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('No canvas context'));
+        ctx.drawImage(img, 0, 0);
+        const totalArea = img.width * img.height;
+        const scaleX = img.width / (segmentMasks?.width ?? img.width);
+        const scaleY = img.height / (segmentMasks?.height ?? img.height);
+        masks.forEach((m) => {
+          const label = labels[m.id];
+          const color = label === 'glass' ? 'rgba(30, 144, 255, 0.6)' : label === 'signboard' ? 'rgba(220, 53, 69, 0.6)' : 'rgba(128, 128, 128, 0.4)';
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          const pts = m.polygon.map(([x, y]) => [x * scaleX, y * scaleY] as [number, number]);
+          ctx.moveTo(pts[0][0], pts[0][1]);
+          for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+          ctx.closePath();
+          ctx.fill();
+        });
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = () => reject(new Error('Image load failed'));
+      img.src = imgUrl;
+    });
+  };
+
+  const confirmCompute = async () => {
+    if (!selectedImage || !segmentMasks) return;
+    const glassIds = Object.entries(maskLabels).filter(([, v]) => v === 'glass').map(([k]) => Number(k));
+    const signboardIds = Object.entries(maskLabels).filter(([, v]) => v === 'signboard').map(([k]) => Number(k));
+    const totalArea = segmentMasks.width * segmentMasks.height;
+    const glassPixels = segmentMasks.masks.filter((m) => glassIds.includes(m.id)).reduce((s, m) => s + m.area, 0);
+    const signboardPixels = segmentMasks.masks.filter((m) => signboardIds.includes(m.id)).reduce((s, m) => s + m.area, 0);
+    const transparency = Math.min(100, Math.round((glassPixels / totalArea) * 100));
+    const signageRatio = signboardPixels / totalArea;
+    const signageScale = Math.min(100, Math.round(signageRatio * 100 * 3));
+    let colorRichness = 0;
+    let colorRichnessRaw = 0;
+    let colorRawVars: ColorRawVars | undefined;
+    try {
+      const crData = await sam2ColorRichnessFull(selectedImage);
+      colorRichness = crData.ColorRichness;
+      colorRichnessRaw = crData.ColorRichnessRaw;
+      colorRawVars = crData.ColorRawVars;
+    } catch (e) {
+      console.warn('Color richness failed:', e);
+    }
+    const overlayUrl = await buildAnnotatedOverlay(selectedImage, segmentMasks.masks, maskLabels);
+    setAnnotatedOverlayUrl(overlayUrl);
+    setMetrics({
+      Transparency: transparency,
+      SignageScale: signageScale,
+      ColorRichness: colorRichness,
+      ColorRichnessRaw: colorRichnessRaw,
+      ColorRawVars: colorRawVars,
+      HueHistogram: [],
+      StyleDescription: 'Manual labeling via SAM2 segmentation',
+      Reasoning: `User labeled ${glassIds.length} glass / ${signboardIds.length} signboard regions.`,
+    });
+    setLastAnalysisTimestamp(new Date().toISOString());
+      setActiveTab('analysis');
   };
 
   const downloadImage = (url: string, filename: string) => {
@@ -152,85 +260,13 @@ export default function App() {
     document.body.removeChild(link);
   };
 
-  const handleSaveSegmentation = () => {
-    if (stageRef.current) {
-      const dataUrl = stageRef.current.toDataURL();
-      setIsEditingSeg(false);
-      setLines([]); // Clear lines after saving
-      analyzeImage(dataUrl); // Re-analyze with custom map
-    }
-  };
-
-  const handleMouseDown = (e: any) => {
-    if (!isEditingSeg) return;
-    const stage = e.target.getStage();
-    const pos = stage.getPointerPosition();
-    setLines([...lines, { tool: 'brush', color: brushColor, points: [pos.x, pos.y] }]);
-  };
-
-  const handleMouseMove = (e: any) => {
-    if (!isEditingSeg || lines.length === 0) return;
-    const stage = e.target.getStage();
-    const point = stage.getPointerPosition();
-    let lastLine = { ...lines[lines.length - 1] };
-    lastLine.points = lastLine.points.concat([point.x, point.y]);
-    
-    const newLines = [...lines];
-    newLines[newLines.length - 1] = lastLine;
-    setLines(newLines);
-  };
-
-  const handleMouseUp = () => {
-    // End of drawing line
-  };
-
-  const generateVariation = async (direction: 'increase' | 'decrease', type: keyof Omit<FacadeMetrics, 'StyleDescription' | 'Reasoning' | 'segmentationImageUrl'>) => {
-    if (!selectedImage || !metrics) return;
-    const config = getDoubaoConfig();
-    if (!config || !config.imageEndpoint) {
-      alert('Configure DOUBAO_API_KEY and DOUBAO_IMAGE_ENDPOINT in .env');
-      return;
-    }
-    setIsGenerating(true);
-    setActiveTab('generation');
-
-    try {
-      const newMetrics = {
-        transparency: type === 'Transparency' 
-          ? Math.min(100, Math.max(0, metrics.Transparency + (direction === 'increase' ? gradient : -gradient)))
-          : metrics.Transparency,
-        signage: type === 'SignageScale'
-          ? Math.min(100, Math.max(0, metrics.SignageScale + (direction === 'increase' ? gradient : -gradient)))
-          : metrics.SignageScale,
-        color: type === 'ColorRichness'
-          ? Math.min(100, Math.max(0, metrics.ColorRichness + (direction === 'increase' ? gradient : -gradient)))
-          : metrics.ColorRichness,
-      };
-
-      const prompt = `Facade redesign task. Modify only the building facade in the image. Keep original proportions, perspective, and surroundings (sky, street, adjacent buildings) unchanged.
-Redesign the facade to achieve: transparency ${newMetrics.transparency}%, signage scale ${newMetrics.signage}%, color richness ${newMetrics.color}%.
-Preserve architectural style: ${metrics.StyleDescription}. Result should look like a real renovation, no cropping or resizing.`;
-
-      const { imageUrl, seed } = await doubaoImageGenerate(config, prompt, { image: selectedImage });
-
-      const ts = new Date().toISOString();
-      setLastGenerationMeta({ prompt, model: config.imageEndpoint, seed, timestamp: ts });
-      setGenerations(prev => [{
-        id: Date.now().toString(),
-        imageUrl,
-        metrics: newMetrics,
-        prompt,
-        model: config.imageEndpoint,
-        seed,
-        timestamp: ts,
-      }, ...prev]);
-    } catch (error: unknown) {
-      console.error("Generation failed:", error);
-      const msg = error instanceof Error ? error.message : String(error);
-      alert("Generation failed: " + (msg || "Please retry."));
-    } finally {
-      setIsGenerating(false);
-    }
+  const setMaskLabel = (maskId: number, label: 'glass' | 'signboard' | null) => {
+    setMaskLabels((prev) => {
+      const next = { ...prev };
+      if (label) next[maskId] = label;
+      else delete next[maskId];
+      return next;
+    });
   };
 
   const generateFromPrompt = async () => {
@@ -250,8 +286,21 @@ Preserve architectural style: ${metrics.StyleDescription}. Result should look li
       setLastGenerationMeta({ prompt: customPrompt.trim(), model: config.imageEndpoint, seed, timestamp: ts });
       setSelectedImage(imageUrl);
       setMetrics(null);
+      setSegmentMasks(null);
+      setMaskLabels({});
+      setLabelMode(null);
+      setAnnotatedOverlayUrl(null);
       setActiveTab('analysis');
-      await analyzeImageWithImage(imageUrl);
+      // 生成后自动触发 SAM2 分割
+      setIsAnalyzing(true);
+      try {
+        const result = await sam2SegmentMasks(imageUrl);
+        setSegmentMasks(result);
+      } catch (e) {
+        console.error('Auto-segment after generate failed:', e);
+      } finally {
+        setIsAnalyzing(false);
+      }
     } catch (error: unknown) {
       console.error('Prompt generation failed:', error);
       alert('Generation failed: ' + (error instanceof Error ? error.message : 'Please retry.'));
@@ -267,54 +316,40 @@ Preserve architectural style: ${metrics.StyleDescription}. Result should look li
       return;
     }
     const timestamp = lastGenerationMeta?.timestamp ?? lastAnalysisTimestamp ?? new Date().toISOString();
-    let metricsToExport = metrics
+    let metricsToExport: { Transparency: number; SignageScale: number; ColorRichness: number; ColorRichnessRaw?: number; ColorRawVars?: ColorRawVars } | undefined = metrics
       ? { Transparency: metrics.Transparency, SignageScale: metrics.SignageScale, ColorRichness: metrics.ColorRichness, ColorRichnessRaw: metrics.ColorRichnessRaw, ColorRawVars: metrics.ColorRawVars }
       : generations[0]
-        ? { Transparency: generations[0].metrics.transparency, SignageScale: generations[0].metrics.signage, ColorRichness: generations[0].metrics.color, ColorRichnessRaw: undefined as number | undefined, ColorRawVars: undefined as typeof metrics.ColorRawVars }
+        ? { Transparency: generations[0].metrics.transparency, SignageScale: generations[0].metrics.signage, ColorRichness: generations[0].metrics.color }
         : undefined;
-    // 对导出图片调用 color-richness 获取 ColorRawVars，确保与导出图像一致（兼容旧 SAM2、生成图等场景）
     try {
       const crData = await sam2ColorRichnessFull(imageToExport);
-      metricsToExport = {
-        ...(metricsToExport ?? {}),
-        ColorRichness: metricsToExport?.ColorRichness ?? crData.ColorRichness,
-        ColorRichnessRaw: crData.ColorRichnessRaw,
-        ColorRawVars: crData.ColorRawVars,
-      };
+      if (metricsToExport) {
+        metricsToExport = {
+          Transparency: metricsToExport.Transparency,
+          SignageScale: metricsToExport.SignageScale,
+          ColorRichness: metricsToExport.ColorRichness ?? crData.ColorRichness,
+          ColorRichnessRaw: crData.ColorRichnessRaw,
+          ColorRawVars: crData.ColorRawVars,
+        };
+      } else {
+        metricsToExport = {
+          Transparency: 0,
+          SignageScale: 0,
+          ColorRichness: crData.ColorRichness,
+          ColorRichnessRaw: crData.ColorRichnessRaw,
+          ColorRawVars: crData.ColorRawVars,
+        };
+      }
     } catch (e) {
       console.warn('Could not fetch ColorRawVars for export:', e);
     }
     await exportToXlsx({
       imageDataUrl: imageToExport,
+      segmentationImageUrl: annotatedOverlayUrl ?? undefined,
       timestamp,
       metrics: metricsToExport ?? undefined,
       generation: lastGenerationMeta ?? undefined,
     });
-  };
-
-  const analyzeImageWithImage = async (imageUrl: string) => {
-    setIsAnalyzing(true);
-    try {
-      const result = await sam2Segment(imageUrl);
-      setMetrics({
-        Transparency: result.Transparency,
-        SignageScale: result.SignageScale,
-        ColorRichness: result.ColorRichness,
-        ColorRichnessRaw: result.ColorRichnessRaw,
-        ColorRawVars: result.ColorRawVars,
-        HueHistogram: result.HueHistogram,
-        StyleDescription: result.StyleDescription,
-        Reasoning: result.Reasoning,
-        segmentationImageUrl: result.segmentation_image_base64,
-      });
-      setLastAnalysisTimestamp(new Date().toISOString());
-    } catch (error: unknown) {
-      console.error('Analysis failed:', error);
-      const msg = error instanceof Error ? error.message : 'Check SAM2 service.';
-      alert('Analysis failed: ' + msg);
-    } finally {
-      setIsAnalyzing(false);
-    }
   };
 
   return (
@@ -335,6 +370,10 @@ Preserve architectural style: ${metrics.StyleDescription}. Result should look li
             onClick={() => {
               setSelectedImage(null);
               setMetrics(null);
+              setSegmentMasks(null);
+              setMaskLabels({});
+              setLabelMode(null);
+              setAnnotatedOverlayUrl(null);
               setGenerations([]);
               setLastAnalysisTimestamp(null);
               setLastGenerationMeta(null);
@@ -404,74 +443,72 @@ Preserve architectural style: ${metrics.StyleDescription}. Result should look li
                     </div>
                     <img src={selectedImage} alt="Uploaded facade" className="max-w-full h-auto block mx-auto rounded-lg shadow-sm" />
                   </div>
-                  {metrics?.segmentationImageUrl && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="space-y-2 w-full"
-                    >
+                  {(segmentMasks || annotatedOverlayUrl) && (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-2 w-full">
                       <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-mono uppercase opacity-50">Instance Segmentation Map</span>
-                        <div className="flex gap-2">
-                          <div className="flex items-center gap-1"><div className="w-2 h-2 bg-blue-500 rounded-full"></div><span className="text-[8px] uppercase">Glass</span></div>
-                          <div className="flex items-center gap-1"><div className="w-2 h-2 bg-red-500 rounded-full"></div><span className="text-[8px] uppercase">Signage</span></div>
-                        </div>
+                        <span className="text-[10px] font-mono uppercase opacity-50">
+                          {segmentMasks ? (labelMode ? `当前: ${labelMode === 'glass' ? 'Glass' : 'Signboard'}，点击区域标注/取消，空白处添加新区块` : '先选择标签，再点击区域') : '标注分割图'}
+                        </span>
                       </div>
-                      
                       <div className="relative border border-[#141414]/10 rounded-lg overflow-hidden bg-white">
-                        {isEditingSeg ? (
-                          <div className="flex flex-col">
-                            <div className="p-2 bg-[#F0F0F0] border-b border-[#141414]/10 flex justify-between items-center">
-                              <div className="flex gap-2">
-                                <BrushButton color="#3b82f6" active={brushColor === '#3b82f6'} onClick={() => setBrushColor('#3b82f6')} label="Glass" />
-                                <BrushButton color="#ef4444" active={brushColor === '#ef4444'} onClick={() => setBrushColor('#ef4444')} label="Signage" />
-                                <button 
-                                  onClick={() => setLines([])}
-                                  className="p-1.5 hover:bg-white rounded text-[#141414]/50 hover:text-red-500 transition-colors"
-                                  title="Clear Edits"
-                                >
-                                  <Eraser size={14} />
-                                </button>
-                              </div>
-                              <div className="flex gap-2">
-                                <button 
-                                  onClick={() => { setIsEditingSeg(false); setLines([]); }}
-                                  className="px-3 py-1 text-[10px] font-bold uppercase border border-[#141414]/20 rounded-full hover:bg-white"
-                                >
-                                  Cancel
-                                </button>
-                                <button 
-                                  onClick={handleSaveSegmentation}
-                                  className="px-3 py-1 text-[10px] font-bold uppercase bg-[#141414] text-white rounded-full hover:bg-black flex items-center gap-1"
-                                >
-                                  <Check size={12} /> Apply & Re-Analyze
-                                </button>
-                              </div>
-                            </div>
-                            <SegmentationCanvas 
-                              imageUrl={metrics.segmentationImageUrl} 
-                              lines={lines} 
-                              onMouseDown={handleMouseDown}
-                              onMouseMove={handleMouseMove}
-                              onMouseUp={handleMouseUp}
-                              stageRef={stageRef}
-                            />
-                          </div>
-                        ) : (
-                          <div className="group relative">
-                            <img src={metrics.segmentationImageUrl} alt="Segmentation map" className="max-w-full h-auto block mx-auto" />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
-                              <button 
-                                onClick={() => setIsEditingSeg(true)}
-                                className="bg-white text-[#141414] px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 shadow-lg hover:scale-105 transition-transform"
-                              >
-                                <Edit3 size={14} />
-                                Edit Segmentation
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                        {segmentMasks ? (
+                          <MaskLabeler
+                            imageUrl={selectedImage}
+                            masks={segmentMasks.masks}
+                            maskLabels={maskLabels}
+                            labelMode={labelMode}
+                            onMaskClick={handleMaskClick}
+                            onAddMaskAtPoint={handleAddMaskAtPoint}
+                            imgWidth={segmentMasks.width}
+                            imgHeight={segmentMasks.height}
+                            isAddingMask={isAnalyzing}
+                          />
+                        ) : annotatedOverlayUrl ? (
+                          <img src={annotatedOverlayUrl} alt="Annotated segmentation" className="max-w-full h-auto block mx-auto" />
+                        ) : null}
                       </div>
+                      {segmentMasks && (
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <span className="text-[10px] font-mono uppercase opacity-50">标签:</span>
+                          <button
+                            onClick={() => setLabelMode('glass')}
+                            className={cn(
+                              "px-4 py-1.5 text-[10px] font-bold uppercase rounded-full border transition-all",
+                              labelMode === 'glass' ? "bg-blue-500 text-white border-blue-500" : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                            )}
+                          >
+                            Glass
+                          </button>
+                          <button
+                            onClick={() => setLabelMode('signboard')}
+                            className={cn(
+                              "px-4 py-1.5 text-[10px] font-bold uppercase rounded-full border transition-all",
+                              labelMode === 'signboard' ? "bg-red-500 text-white border-red-500" : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                            )}
+                          >
+                            Signboard
+                          </button>
+                          <button
+                            onClick={() => setLabelMode(null)}
+                            className="px-3 py-1.5 text-[10px] font-bold uppercase border border-[#141414]/20 rounded-full hover:bg-[#F0F0F0]"
+                          >
+                            取消选择
+                          </button>
+                          <span className="flex-1" />
+                          <button
+                            onClick={() => { setMaskLabels({}); }}
+                            className="px-3 py-1.5 text-[10px] font-bold uppercase border border-[#141414]/20 rounded-full hover:bg-[#F0F0F0]"
+                          >
+                            清空标注
+                          </button>
+                          <button
+                            onClick={confirmCompute}
+                            className="px-4 py-1.5 text-[10px] font-bold uppercase bg-[#141414] text-white rounded-full hover:bg-black flex items-center gap-1"
+                          >
+                            <Check size={12} /> 确认计算
+                          </button>
+                        </div>
+                      )}
                     </motion.div>
                   )}
                 </div>
@@ -484,15 +521,22 @@ Preserve architectural style: ${metrics.StyleDescription}. Result should look li
                   <p className="text-sm font-medium opacity-40">Click to upload street facade</p>
                 </div>
               )}
-              {selectedImage && !metrics && (
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+              {selectedImage && !segmentMasks && !metrics && (
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 backdrop-blur-[2px]">
                   <button 
-                    onClick={() => analyzeImage()}
+                    onClick={runSegmentMasks}
                     disabled={isAnalyzing}
                     className="bg-white text-[#141414] px-6 py-3 rounded-full font-bold flex items-center gap-2 shadow-2xl hover:scale-105 transition-transform"
                   >
                     {isAnalyzing ? <Loader2 className="animate-spin" /> : <Zap size={20} />}
-                    {isAnalyzing ? 'Analyzing...' : 'Analyze Metrics'}
+                    {isAnalyzing ? '分割中...' : 'SAM2 分割'}
+                  </button>
+                  <button 
+                    onClick={startDirectLabeling}
+                    disabled={isAnalyzing}
+                    className="bg-white/90 text-[#141414] px-6 py-3 rounded-full font-bold flex items-center gap-2 shadow-2xl hover:scale-105 transition-transform border border-[#141414]/20"
+                  >
+                    直接标注
                   </button>
                 </div>
               )}
@@ -571,14 +615,6 @@ Preserve architectural style: ${metrics.StyleDescription}. Result should look li
                   Variations ({generations.length})
                 </button>
               </div>
-              <div className="flex items-center gap-3 bg-[#F0F0F0] px-3 py-1 rounded-full">
-                <span className="text-[10px] font-mono uppercase opacity-50">Step Gradient</span>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setGradient(Math.max(5, gradient - 5))} className="hover:text-blue-600"><Minus size={12} /></button>
-                  <span className="text-xs font-bold w-8 text-center">{gradient}%</span>
-                  <button onClick={() => setGradient(Math.min(50, gradient + 5))} className="hover:text-blue-600"><Plus size={12} /></button>
-                </div>
-              </div>
             </div>
 
             <div className="p-6 min-h-[400px]">
@@ -606,34 +642,11 @@ Preserve architectural style: ${metrics.StyleDescription}. Result should look li
                   {!metrics ? (
                     <div className="h-[200px] flex flex-col items-center justify-center text-center opacity-30">
                       <RefreshCw size={48} className="mb-4 animate-spin-slow" />
-                      <p className="text-sm">Upload and analyze an image to unlock design controls</p>
+                      <p className="text-sm">上传图片并完成 SAM2 分割与标注后，可在此查看指标</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <ControlCard 
-                        title="Transparency" 
-                        value={metrics.Transparency}
-                        onIncrease={() => generateVariation('increase', 'Transparency')}
-                        onDecrease={() => generateVariation('decrease', 'Transparency')}
-                        isGenerating={isGenerating}
-                        gradient={gradient}
-                      />
-                      <ControlCard 
-                        title="Signage" 
-                        value={metrics.SignageScale}
-                        onIncrease={() => generateVariation('increase', 'SignageScale')}
-                        onDecrease={() => generateVariation('decrease', 'SignageScale')}
-                        isGenerating={isGenerating}
-                        gradient={gradient}
-                      />
-                      <ControlCard 
-                        title="Colors" 
-                        value={metrics.ColorRichness}
-                        onIncrease={() => generateVariation('increase', 'ColorRichness')}
-                        onDecrease={() => generateVariation('decrease', 'ColorRichness')}
-                        isGenerating={isGenerating}
-                        gradient={gradient}
-                      />
+                    <div className="p-4 bg-[#FAFAFA] rounded-xl border border-[#141414]/10">
+                      <p className="text-sm text-[#141414]/70">指标已根据手动标注计算完成，可使用下方 Prompt 生成新图。</p>
                     </div>
                   )}
                   </div>
@@ -784,39 +797,82 @@ function MetricBar({ label, value, icon, description }: { label: string, value: 
   );
 }
 
-function ControlCard({ title, value, onIncrease, onDecrease, isGenerating, gradient }: { 
-  title: string, 
-  value: number, 
-  onIncrease: () => void, 
-  onDecrease: () => void,
-  isGenerating: boolean,
-  gradient: number
+function MaskLabeler({ imageUrl, masks, maskLabels, labelMode, onMaskClick, onAddMaskAtPoint, imgWidth, imgHeight, isAddingMask }: {
+  imageUrl: string;
+  masks: MaskItem[];
+  maskLabels: Record<number, 'glass' | 'signboard'>;
+  labelMode: 'glass' | 'signboard' | null;
+  onMaskClick: (id: number) => void;
+  onAddMaskAtPoint?: (x: number, y: number) => void;
+  imgWidth: number;
+  imgHeight: number;
+  isAddingMask?: boolean;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const update = () => {
+      const el = containerRef.current;
+      if (!el) return;
+      const w = el.offsetWidth;
+      const scale = w / imgWidth;
+      setSize({ w, h: imgHeight * scale });
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [imgWidth, imgHeight]);
+
+  const handleBackgroundClick = (e: React.MouseEvent<SVGRectElement>) => {
+    if (!onAddMaskAtPoint || isAddingMask) return;
+    const svg = e.currentTarget.ownerSVGElement;
+    if (!svg) return;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const svgPt = pt.matrixTransform(svg.getScreenCTM()?.inverse());
+    onAddMaskAtPoint(Math.round(svgPt.x), Math.round(svgPt.y));
+  };
+
   return (
-    <div className="p-6 border border-[#141414] rounded-xl space-y-6 hover:bg-[#F9F9F9] transition-colors group">
-      <div className="text-center">
-        <h3 className="text-[10px] font-mono uppercase tracking-widest opacity-50 mb-1">{title}</h3>
-        <div className="text-3xl font-mono font-bold">{value}%</div>
-      </div>
-      
-      <div className="flex flex-col gap-3">
-        <button 
-          onClick={onIncrease}
-          disabled={isGenerating || value >= 100}
-          className="w-full py-3 border border-[#141414] rounded-lg flex items-center justify-center gap-2 hover:bg-[#141414] hover:text-white transition-all disabled:opacity-30"
-        >
-          <Plus size={16} />
-          <span className="text-xs font-bold">+{gradient}%</span>
-        </button>
-        <button 
-          onClick={onDecrease}
-          disabled={isGenerating || value <= 0}
-          className="w-full py-3 border border-[#141414] rounded-lg flex items-center justify-center gap-2 hover:bg-[#141414] hover:text-white transition-all disabled:opacity-30"
-        >
-          <Minus size={16} />
-          <span className="text-xs font-bold">-{gradient}%</span>
-        </button>
-      </div>
+    <div ref={containerRef} className="relative w-full">
+      {size.w > 0 && (
+        <div className="relative" style={{ width: size.w, height: size.h }}>
+          <img src={imageUrl} alt="Facade" className="absolute inset-0 w-full h-full object-contain" style={{ objectFit: 'contain' }} />
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" width="100%" height="100%" viewBox={`0 0 ${imgWidth} ${imgHeight}`} preserveAspectRatio="xMidYMid meet">
+            {masks.map((m) => {
+              const label = maskLabels[m.id];
+              const fill = label === 'glass' ? 'rgba(30, 144, 255, 0.55)' : label === 'signboard' ? 'rgba(220, 53, 69, 0.55)' : 'rgba(0, 180, 255, 0.45)';
+              const pts = m.polygon.map(([x, y]) => `${x},${y}`).join(' ');
+              return <polygon key={m.id} points={pts} fill={fill} stroke="rgba(0,0,0,0.25)" strokeWidth={1.5} />;
+            })}
+          </svg>
+          <svg className="absolute inset-0 w-full h-full" style={{ cursor: isAddingMask ? 'wait' : 'pointer' }} width="100%" height="100%" viewBox={`0 0 ${imgWidth} ${imgHeight}`} preserveAspectRatio="xMidYMid meet">
+            <rect x={0} y={0} width={imgWidth} height={imgHeight} fill="transparent" pointerEvents="all" onClick={handleBackgroundClick} />
+            {masks.map((m) => {
+              const pts = m.polygon.map(([x, y]) => `${x},${y}`).join(' ');
+              return (
+                <polygon
+                  key={m.id}
+                  points={pts}
+                  fill="transparent"
+                  pointerEvents="all"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMaskClick(m.id);
+                  }}
+                />
+              );
+            })}
+          </svg>
+          {isAddingMask && (
+            <div className="absolute inset-0 bg-black/20 flex items-center justify-center pointer-events-none">
+              <Loader2 className="animate-spin text-white" size={32} />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -830,71 +886,3 @@ function Badge({ label, value }: { label: string, value: number }) {
   );
 }
 
-function BrushButton({ color, active, onClick, label }: { color: string, active: boolean, onClick: () => void, label: string }) {
-  return (
-    <button 
-      onClick={onClick}
-      className={cn(
-        "flex items-center gap-1.5 px-2 py-1 rounded-md text-[9px] font-bold uppercase transition-all border",
-        active ? "bg-white border-[#141414] shadow-sm" : "bg-transparent border-transparent opacity-50 hover:opacity-100"
-      )}
-    >
-      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }}></div>
-      {label}
-    </button>
-  );
-}
-
-function SegmentationCanvas({ imageUrl, lines, onMouseDown, onMouseMove, onMouseUp, stageRef }: any) {
-  const [image] = useImage(imageUrl);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (image) {
-      const containerWidth = containerRef.current?.offsetWidth || 0;
-      const scale = containerWidth / image.width;
-      setDimensions({
-        width: containerWidth,
-        height: image.height * scale
-      });
-    }
-  }, [image]);
-
-  return (
-    <div ref={containerRef} className="w-full bg-white cursor-crosshair">
-      {dimensions.width > 0 && (
-        <Stage
-          width={dimensions.width}
-          height={dimensions.height}
-          onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
-          onMouseUp={onMouseUp}
-          ref={stageRef}
-        >
-          <Layer>
-            <KonvaImage 
-              image={image} 
-              width={dimensions.width} 
-              height={dimensions.height} 
-            />
-            {lines.map((line: any, i: number) => (
-              <Line
-                key={i}
-                points={line.points}
-                stroke={line.color}
-                strokeWidth={10}
-                tension={0.5}
-                lineCap="round"
-                lineJoin="round"
-                globalCompositeOperation={
-                  line.tool === 'eraser' ? 'destination-out' : 'source-over'
-                }
-              />
-            ))}
-          </Layer>
-        </Stage>
-      )}
-    </div>
-  );
-}
