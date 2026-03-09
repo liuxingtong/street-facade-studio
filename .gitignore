@@ -21,8 +21,23 @@ venv/
 # IDE / 编辑器
 .cursor/
 .idea/
+.vscode/*.log
 *.swp
 *.swo
 
-# 与本地部署无关
+# 与本地部署无关（云部署、迁移文档等）
 metadata.json
+DEPLOY.md
+DEPLOY-RAILWAY.md
+netlify/
+netlify.toml
+railway.json
+sam2_server/railway.json
+IMAGE_GENERATION_ALTERNATIVES.md
+REQUIREMENTS.md
+街景glass_signboard分割迁移指南.md
+
+# Cursor / 工作区
+agent-transcripts/
+agent-tools/
+

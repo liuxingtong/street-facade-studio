@@ -1,6 +1,7 @@
 # 街景立面分割服务（SAM2）
 
 - **SAM2**：`/segment-masks` 自动切割，返回可点击标注的 mask 列表
+- **点提示**：`/segment-at-point` 点击坐标分割该区域（全图可标注）
 - **色彩丰富度**：`/color-richness`
 
 ## 安装与运行
@@ -18,11 +19,13 @@ python -m uvicorn app:app --port 3002 --reload
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `SAM2_MODEL` | `facebook/sam2.1-hiera-base-plus` | SAM2 模型 |
-| `SAM2_MAX_MASKS` | `50` | 最多返回 mask 数量 |
-| `SAM2_MIN_AREA_RATIO` | `0.005` | 最小面积占比（0.5%） |
+| `SAM2_MAX_MASKS` | `80` | 最多返回 mask 数量 |
+| `SAM2_MIN_AREA_RATIO` | `0.002` | 最小面积占比（0.2%） |
+| `SAM2_MAX_SIZE` | `512` | 输入长边上限，降低 GPU 消耗 |
 
 ## API
 
-- `POST /segment-masks`：SAM2 切割，返回 `{ masks, width, height }`，前端手动标注后计算指标
+- `POST /segment-masks`：SAM2 自动切割，返回 `{ masks, width, height }`
+- `POST /segment-at-point`：点提示分割，请求 `{ image_base64, x, y }`，返回单个 mask
 - `POST /color-richness`：色彩丰富度
 - `GET /health`：健康检查
