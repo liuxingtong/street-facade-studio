@@ -65,6 +65,7 @@ export default function App() {
   const [segmentMasks, setSegmentMasks] = useState<{ masks: MaskItem[]; width: number; height: number } | null>(null);
   const [maskLabels, setMaskLabels] = useState<Record<number, 'glass' | 'signboard'>>({});
   const [labelMode, setLabelMode] = useState<'glass' | 'signboard' | null>(null);
+  const [showEditMode, setShowEditMode] = useState(true);  // true=可编辑标注，false=查看标注结果
   const [annotatedOverlayUrl, setAnnotatedOverlayUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generations, setGenerations] = useState<GenerationResult[]>([]);
@@ -86,6 +87,7 @@ export default function App() {
         setSegmentMasks(null);
         setMaskLabels({});
         setLabelMode(null);
+        setShowEditMode(true);
         setAnnotatedOverlayUrl(null);
         setGenerations([]);
         setActiveTab('analysis');
@@ -166,6 +168,7 @@ export default function App() {
     setSegmentMasks(null);
     setMaskLabels({});
     setLabelMode(null);
+    setShowEditMode(true);
     setAnnotatedOverlayUrl(null);
     try {
       const result = await sam2SegmentMasks(selectedImage);
@@ -237,6 +240,7 @@ export default function App() {
     }
     const overlayUrl = await buildAnnotatedOverlay(selectedImage, segmentMasks.masks, maskLabels);
     setAnnotatedOverlayUrl(overlayUrl);
+    setShowEditMode(false);  // 计算完成后切换到查看结果
     setMetrics({
       Transparency: transparency,
       SignageScale: signageScale,
@@ -289,6 +293,7 @@ export default function App() {
       setSegmentMasks(null);
       setMaskLabels({});
       setLabelMode(null);
+      setShowEditMode(true);
       setAnnotatedOverlayUrl(null);
       setActiveTab('analysis');
       // 生成后自动触发 SAM2 分割
@@ -373,6 +378,7 @@ export default function App() {
               setSegmentMasks(null);
               setMaskLabels({});
               setLabelMode(null);
+              setShowEditMode(true);
               setAnnotatedOverlayUrl(null);
               setGenerations([]);
               setLastAnalysisTimestamp(null);
@@ -447,11 +453,15 @@ export default function App() {
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-2 w-full">
                       <div className="flex justify-between items-center">
                         <span className="text-[10px] font-mono uppercase opacity-50">
-                          {segmentMasks ? (labelMode ? `当前: ${labelMode === 'glass' ? 'Glass' : 'Signboard'}，点击区域标注/取消，空白处添加新区块` : '先选择标签，再点击区域') : '标注分割图'}
+                          {segmentMasks
+                            ? showEditMode
+                              ? (labelMode ? `当前: ${labelMode === 'glass' ? 'Glass' : 'Signboard'}，点击区域标注/取消，空白处添加新区块` : '先选择标签，再点击区域')
+                              : '标注结果，点击「修改标注」可重新编辑'
+                            : '标注分割图'}
                         </span>
                       </div>
                       <div className="relative border border-[#141414]/10 rounded-lg overflow-hidden bg-white">
-                        {segmentMasks ? (
+                        {segmentMasks && showEditMode ? (
                           <MaskLabeler
                             imageUrl={selectedImage}
                             masks={segmentMasks.masks}
@@ -469,44 +479,59 @@ export default function App() {
                       </div>
                       {segmentMasks && (
                         <div className="flex flex-wrap gap-2 items-center">
-                          <span className="text-[10px] font-mono uppercase opacity-50">标签:</span>
-                          <button
-                            onClick={() => setLabelMode('glass')}
-                            className={cn(
-                              "px-4 py-1.5 text-[10px] font-bold uppercase rounded-full border transition-all",
-                              labelMode === 'glass' ? "bg-blue-500 text-white border-blue-500" : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-                            )}
-                          >
-                            Glass
-                          </button>
-                          <button
-                            onClick={() => setLabelMode('signboard')}
-                            className={cn(
-                              "px-4 py-1.5 text-[10px] font-bold uppercase rounded-full border transition-all",
-                              labelMode === 'signboard' ? "bg-red-500 text-white border-red-500" : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
-                            )}
-                          >
-                            Signboard
-                          </button>
-                          <button
-                            onClick={() => setLabelMode(null)}
-                            className="px-3 py-1.5 text-[10px] font-bold uppercase border border-[#141414]/20 rounded-full hover:bg-[#F0F0F0]"
-                          >
-                            取消选择
-                          </button>
-                          <span className="flex-1" />
-                          <button
-                            onClick={() => { setMaskLabels({}); }}
-                            className="px-3 py-1.5 text-[10px] font-bold uppercase border border-[#141414]/20 rounded-full hover:bg-[#F0F0F0]"
-                          >
-                            清空标注
-                          </button>
-                          <button
-                            onClick={confirmCompute}
-                            className="px-4 py-1.5 text-[10px] font-bold uppercase bg-[#141414] text-white rounded-full hover:bg-black flex items-center gap-1"
-                          >
-                            <Check size={12} /> 确认计算
-                          </button>
+                          {showEditMode ? (
+                            <>
+                              <span className="text-[10px] font-mono uppercase opacity-50">标签:</span>
+                              <button
+                                onClick={() => setLabelMode('glass')}
+                                className={cn(
+                                  "px-4 py-1.5 text-[10px] font-bold uppercase rounded-full border transition-all",
+                                  labelMode === 'glass' ? "bg-blue-500 text-white border-blue-500" : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                                )}
+                              >
+                                Glass
+                              </button>
+                              <button
+                                onClick={() => setLabelMode('signboard')}
+                                className={cn(
+                                  "px-4 py-1.5 text-[10px] font-bold uppercase rounded-full border transition-all",
+                                  labelMode === 'signboard' ? "bg-red-500 text-white border-red-500" : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                                )}
+                              >
+                                Signboard
+                              </button>
+                              <button
+                                onClick={() => setLabelMode(null)}
+                                className="px-3 py-1.5 text-[10px] font-bold uppercase border border-[#141414]/20 rounded-full hover:bg-[#F0F0F0]"
+                              >
+                                取消选择
+                              </button>
+                              <span className="flex-1" />
+                              <button
+                                onClick={() => { setMaskLabels({}); }}
+                                className="px-3 py-1.5 text-[10px] font-bold uppercase border border-[#141414]/20 rounded-full hover:bg-[#F0F0F0]"
+                              >
+                                清空标注
+                              </button>
+                              <button
+                                onClick={confirmCompute}
+                                className="px-4 py-1.5 text-[10px] font-bold uppercase bg-[#141414] text-white rounded-full hover:bg-black flex items-center gap-1"
+                              >
+                                <Check size={12} /> 确认计算
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-[10px] font-mono uppercase opacity-50">标注结果</span>
+                              <span className="flex-1" />
+                              <button
+                                onClick={() => setShowEditMode(true)}
+                                className="px-4 py-1.5 text-[10px] font-bold uppercase border border-[#141414]/30 rounded-full hover:bg-[#F0F0F0]"
+                              >
+                                修改标注
+                              </button>
+                            </>
+                          )}
                         </div>
                       )}
                     </motion.div>
