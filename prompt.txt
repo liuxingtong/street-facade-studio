@@ -1,27 +1,22 @@
-1. lSlWlR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a low total area of signboards, a low total area of windowpanes, and a low level of color richness.
-2. lSlWmR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a low total area of signboards, a low total area of windowpanes, and a moderate level of color richness.
-3. lSlWhR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a low total area of signboards, a low total area of windowpanes, and a high level of color richness.
-4. lSmWlR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a low total area of signboards, a moderate total area of windowpanes, and a low level of color richness.
-5. lSmWmR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a low total area of signboards, a moderate total area of windowpanes, and a moderate level of color richness.
-6. lSmWhR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a low total area of signboards, a moderate total area of windowpanes, and a high level of color richness.
-7. lShWlR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a low total area of signboards, a high total area of windowpanes, and a low level of color richness.
-8. lShWmR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a low total area of signboards, a high total area of windowpanes, and a moderate level of color richness.
-9. lShWhR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a low total area of signboards, a high total area of windowpanes, and a high level of color richness.
-10. mSlWlR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a moderate total area of signboards, a low total area of windowpanes, and a low level of color richness.
-11. mSlWmR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a moderate total area of signboards, a low total area of windowpanes, and a moderate level of color richness.
-12. mSlWhR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a moderate total area of signboards, a low total area of windowpanes, and a high level of color richness.
-13. mSmWlR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a moderate total area of signboards, a moderate total area of windowpanes, and a low level of color richness.
-14. mSmWmR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a moderate total area of signboards, a moderate total area of windowpanes, and a moderate level of color richness.
-15. mSmWhR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a moderate total area of signboards, a moderate total area of windowpanes, and a high level of color richness.
-16. mShWlR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a moderate total area of signboards, a high total area of windowpanes, and a low level of color richness.
-17. mShWmR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a moderate total area of signboards, a high total area of windowpanes, and a moderate level of color richness.
-18. mShWhR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a moderate total area of signboards, a high total area of windowpanes, and a high level of color richness.
-19. hSlWlR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a high total area of signboards, a low total area of windowpanes, and a low level of color richness.
-20. hSlWmR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a high total area of signboards, a low total area of windowpanes, and a moderate level of color richness.
-21. hSlWhR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a high total area of signboards, a low total area of windowpanes, and a high level of color richness.
-22. hSmWlR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a high total area of signboards, a moderate total area of windowpanes, and a low level of color richness.
-23. hSmWmR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a high total area of signboards, a moderate total area of windowpanes, and a moderate level of color richness.
-24. hSmWhR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a high total area of signboards, a moderate total area of windowpanes, and a high level of color richness.
-25. hShWlR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a high total area of signboards, a high total area of windowpanes, and a low level of color richness.
-26. hShWmR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a high total area of signboards, a high total area of windowpanes, and a moderate level of color richness.
-27. hShWhR: As a talented architect, please renovate this streetscape to enhance its aesthetic appeal. We would like this street to have a high total area of signboards, a high total area of windowpanes, and a high level of color richness.
+1. lSlWlR
+以专业建筑师和城市设计师的身份，结合场地文脉与周边环境，对该街道景观进行精细化更新改造。对严重破损、老化的区域进行修复与翻新，激活建筑首层界面，打造建筑与街道之间连续、富有吸引力且通透的边界。遵循包容性设计原则，确保街道对各年龄段、不同身体能力的人群而言，都舒适且易达。营造尺度宜人、温馨亲切的人性化空间，吸引人们漫步、休憩、停留。空间节奏舒缓宜人，激发人们探索与休憩的意愿。画面需达到照片级写实效果，细节丰富、整洁有序、兼具美感。街道需满足：招牌总面积占比低、窗玻璃总面积占比低、色彩丰富度低。
+2. lSlWmR
+以专业建筑师和城市设计师的身份，结合场地文脉与周边环境，对该街道景观进行精细化更新改造。对严重破损、老化的区域进行修复与翻新，激活建筑首层界面，打造建筑与街道之间连续、富有吸引力且通透的边界。遵循包容性设计原则，确保街道对各年龄段、不同身体能力的人群而言，都舒适且易达。营造尺度宜人、温馨亲切的人性化空间，吸引人们漫步、休憩、停留。空间节奏舒缓宜人，激发人们探索与休憩的意愿。画面需达到照片级写实效果，细节丰富、整洁有序、兼具美感。街道需满足：招牌总面积占比低、窗玻璃总面积占比低、色彩丰富度适中。
+3. lSlWhR
+以专业建筑师和城市设计师的身份，结合场地文脉与周边环境，对该街道景观进行精细化更新改造。对严重破损、老化的区域进行修复与翻新，激活建筑首层界面，打造建筑与街道之间连续、富有吸引力且通透的边界。遵循包容性设计原则，确保街道对各年龄段、不同身体能力的人群而言，都舒适且易达。营造尺度宜人、温馨亲切的人性化空间，吸引人们漫步、休憩、停留。空间节奏舒缓宜人，激发人们探索与休憩的意愿。画面需达到照片级写实效果，细节丰富、整洁有序、兼具美感。街道需满足：招牌总面积占比低、窗玻璃总面积占比低、色彩丰富度高。
+4. lSmWlR
+以专业建筑师和城市设计师的身份，结合场地文脉与周边环境，对该街道景观进行精细化更新改造。对严重破损、老化的区域进行修复与翻新，激活建筑首层界面，打造建筑与街道之间连续、富有吸引力且通透的边界。遵循包容性设计原则，确保街道对各年龄段、不同身体能力的人群而言，都舒适且易达。营造尺度宜人、温馨亲切的人性化空间，吸引人们漫步、休憩、停留。空间节奏舒缓宜人，激发人们探索与休憩的意愿。画面需达到照片级写实效果，细节丰富、整洁有序、兼具美感。街道需满足：招牌总面积占比低、窗玻璃总面积占比适中、色彩丰富度低。
+5. lSmWmR
+以专业建筑师和城市设计师的身份，结合场地文脉与周边环境，对该街道景观进行精细化更新改造。对严重破损、老化的区域进行修复与翻新，激活建筑首层界面，打造建筑与街道之间连续、富有吸引力且通透的边界。遵循包容性设计原则，确保街道对各年龄段、不同身体能力的人群而言，都舒适且易达。营造尺度宜人、温馨亲切的人性化空间，吸引人们漫步、休憩、停留。空间节奏舒缓宜人，激发人们探索与休憩的意愿。画面需达到照片级写实效果，细节丰富、整洁有序、兼具美感。街道需满足：招牌总面积占比低、窗玻璃总面积占比适中、色彩丰富度适中。
+6. lSmWhR
+以专业建筑师和城市设计师的身份，结合场地文脉与周边环境，对该街道景观进行精细化更新改造。对严重破损、老化的区域进行修复与翻新，激活建筑首层界面，打造建筑与街道之间连续、富有吸引力且通透的边界。遵循包容性设计原则，确保街道对各年龄段、不同身体能力的人群而言，都舒适且易达。营造尺度宜人、温馨亲切的人性化空间，吸引人们漫步、休憩、停留。空间节奏舒缓宜人，激发人们探索与休憩的意愿。画面需达到照片级写实效果，细节丰富、整洁有序、兼具美感。街道需满足：招牌总面积占比低、窗玻璃总面积占比适中、色彩丰富度高。
+7. lShWlR
+修改街道立面，使其变成繁华美观的商业街。画面需达到照片级写实效果，细节丰富、整洁有序、兼具美感。街道需满足：招牌总面积占比低、窗玻璃总面积占比高、色彩丰富度低。
+8. lShWmR
+以专业建筑师和城市设计师的身份，结合场地文脉与周边环境，对该街道景观进行精细化更新改造。对严重破损、老化的区域进行修复与翻新，激活建筑首层界面，打造建筑与街道之间连续、富有吸引力且通透的边界。遵循包容性设计原则，确保街道对各年龄段、不同身体能力的人群而言，都舒适且易达。营造尺度宜人、温馨亲切的人性化空间，吸引人们漫步、休憩、停留。空间节奏舒缓宜人，激发人们探索与休憩的意愿。画面需达到照片级写实效果，细节丰富、整洁有序、兼具美感。街道需满足：招牌总面积占比低、窗玻璃总面积占比高、色彩丰富度适中。
+9. lShWhR
+以专业建筑师和城市设计师的身份，结合场地文脉与周边环境，对该街道景观进行精细化更新改造。对严重破损、老化的区域进行修复与翻新，激活建筑首层界面，打造建筑与街道之间连续、富有吸引力且通透的边界。遵循包容性设计原则，确保街道对各年龄段、不同身体能力的人群而言，都舒适且易达。营造尺度宜人、温馨亲切的人性化空间，吸引人们漫步、休憩、停留。空间节奏舒缓宜人，激发人们探索与休憩的意愿。画面需达到照片级写实效果，细节丰富、整洁有序、兼具美感。街道需满足：招牌总面积占比低、窗玻璃总面积占比高、色彩丰富度高。
+10. mSlWlR
+以专业建筑师和城市设计师的身份，结合场地文脉与周边环境，对该街道景观进行精细化更新改造。对严重破损、老化的区域进行修复与翻新，激活建筑首层界面，打造建筑与街道之间连续、富有吸引力且通透的边界。遵循包容性设计原则，确保街道对各年龄段、不同身体能力的人群而言，都舒适且易达。营造尺度宜人、温馨亲切的人性化空间，吸引人们漫步、休憩、停留。空间节奏舒缓宜人，激发人们探索与休憩的意愿。画面需达到照片级写实效果，细节丰富、整洁有序、兼具美感。街道需满足：招牌总面积占比适中、窗玻璃总面积占比低、色彩丰富度低。
+11. mSlWmR
+以专业建筑师和城市设计师的身份，结合场地文脉与周边环境，对该街道景观进行精细化更新改造。对严重破损、老化的区域进行修复与翻新，激活建筑首层界面，打造建筑与街道之间连续、富有吸引力且通透的边界。遵循包容性设计原则，确保街道对各年龄段、不同身体能力的人群而言，都舒适且易达。营造尺度宜人、温馨亲切的人性化空间，吸引人们漫步、休憩、停留。空间节奏舒缓宜人，激发人们探索与休憩的意愿。画面需达到照片级写实效果，细节丰富、整洁有序、兼具美感。街道需满足：招牌总面积占比适中、窗玻璃总面积占比低、色彩丰富度适中。

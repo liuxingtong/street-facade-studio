@@ -514,6 +514,14 @@ export default function App() {
                                 清空标注
                               </button>
                               <button
+                                onClick={runSegmentMasks}
+                                disabled={isAnalyzing}
+                                className="px-3 py-1.5 text-[10px] font-bold uppercase border border-[#141414]/20 rounded-full hover:bg-[#F0F0F0] flex items-center gap-1"
+                              >
+                                {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                                重新分割
+                              </button>
+                              <button
                                 onClick={confirmCompute}
                                 className="px-4 py-1.5 text-[10px] font-bold uppercase bg-[#141414] text-white rounded-full hover:bg-black flex items-center gap-1"
                               >
@@ -524,6 +532,14 @@ export default function App() {
                             <>
                               <span className="text-[10px] font-mono uppercase opacity-50">标注结果</span>
                               <span className="flex-1" />
+                              <button
+                                onClick={runSegmentMasks}
+                                disabled={isAnalyzing}
+                                className="px-3 py-1.5 text-[10px] font-bold uppercase border border-[#141414]/20 rounded-full hover:bg-[#F0F0F0] flex items-center gap-1"
+                              >
+                                {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                                重新分割
+                              </button>
                               <button
                                 onClick={() => setShowEditMode(true)}
                                 className="px-4 py-1.5 text-[10px] font-bold uppercase border border-[#141414]/30 rounded-full hover:bg-[#F0F0F0]"
